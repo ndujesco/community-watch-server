@@ -2,7 +2,7 @@
 # In the Render dashboard: New > Blueprint, point it at this repo.
 services:
   - type: web
-    name: floodwatch-api
+    name: community-watch-server
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
