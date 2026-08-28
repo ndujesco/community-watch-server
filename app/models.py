@@ -84,6 +84,22 @@ class Station(BaseModel):
     last_seen: datetime | None = None
 
 
+class StationUpdate(BaseModel):
+    """Admin provisioning: name a station, move it to a real site, etc.
+
+    Primarily used to assign a real ``site_id`` (with its calibrated
+    ``channel_depth``/thresholds) to a station that was auto-registered under
+    the fallback "unassigned" site on its first hardware reading.
+    """
+
+    name: str | None = None
+    site_id: str | None = None
+    location: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    status: StationStatus | None = None
+
+
 # --- Readings --------------------------------------------------------------
 class IngestPacket(BaseModel):
     """Decoded RF packet forwarded by the RTL-SDR receiver (report 3.5.2).
@@ -104,6 +120,51 @@ class IngestPacket(BaseModel):
     rssi: float | None = None
     crc_valid: bool = True
     ts: datetime | None = None
+
+
+# --- Device (hardware) ingestion --------------------------------------------
+# Field-for-field mirror of the ESP32 firmware payload described in
+# backend-api-spec.md (POST /api/v1/readings). No flood-detection logic
+# lives here — see services.process_device_reading for the translation into
+# the flood engine's inputs.
+class DeviceNetwork(BaseModel):
+    wifi_connected: bool = True
+    rssi_dbm: int = -70
+
+
+class DeviceUltrasonic(BaseModel):
+    distance_cm: float | None = None
+    status: str = "ok"           # "ok" | "out_of_range"
+
+
+class DeviceClimate(BaseModel):
+    temperature_c: float | None = None
+    humidity_pct: float | None = None
+    status: str = "ok"           # "ok" | "unavailable"
+
+
+class DeviceRain(BaseModel):
+    raw_adc: int
+    wetness_pct: float           # 0 = dry, 100 = fully wet/submerged
+    status: str = "ok"
+
+
+class DeviceFloatSwitch(BaseModel):
+    name: str
+    pin: int
+    triggered: bool
+
+
+class DeviceReadingPacket(BaseModel):
+    device_id: str
+    location: str = "site_unassigned"
+    sequence: int
+    uptime_ms: int
+    network: DeviceNetwork
+    ultrasonic: DeviceUltrasonic
+    climate: DeviceClimate
+    rain: DeviceRain
+    float_switches: list[DeviceFloatSwitch] = Field(default_factory=list)
 
 
 class Reading(BaseModel):

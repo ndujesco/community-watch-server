@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException
 
 from .. import db
+from ..models import StationUpdate
 from ..serialize import jsonify
 
 router = APIRouter()
@@ -44,4 +45,25 @@ async def get_station(station_id: str):
     doc = await db.stations().find_one({"station_id": station_id})
     if not doc:
         raise HTTPException(404, "Station not found")
+    return jsonify(await _attach_latest(doc))
+
+
+@router.patch("/{station_id}")
+async def update_station(station_id: str, update: StationUpdate):
+    """Admin provisioning — e.g. assign an auto-registered device (site_id
+    "unassigned") to its real, calibrated site once installed in the field.
+    """
+    patch = update.model_dump(exclude_none=True)
+    if "status" in patch:
+        patch["status"] = update.status.value  # type: ignore[union-attr]
+    if not patch:
+        raise HTTPException(400, "No fields to update")
+    if "site_id" in patch:
+        site = await db.sites().find_one({"site_id": patch["site_id"]})
+        if not site:
+            raise HTTPException(404, f"Site not found: {patch['site_id']}")
+    res = await db.stations().update_one({"station_id": station_id}, {"$set": patch})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Station not found")
+    doc = await db.stations().find_one({"station_id": station_id})
     return jsonify(await _attach_latest(doc))

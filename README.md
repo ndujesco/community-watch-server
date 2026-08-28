@@ -50,6 +50,7 @@ API docs: <http://localhost:8000/docs> · Health: `/api/health` · WebSocket: `/
 | `SIMULATOR_INTERVAL_SECONDS` | `5` | Seconds between simulated readings |
 | `CORS_ORIGINS` | localhost dev origins | Comma-separated; `*.vercel.app` is always allowed |
 | `ALERT_SENDER` | `floodwatch@unilag.edu.ng` | CAP sender identity |
+| `DEVICE_API_KEYS` | *(empty)* | Comma-separated shared secret(s) checked against `X-Device-Key` on `POST /api/v1/readings`. Empty disables the check (dev only). |
 
 ## Key endpoints
 
@@ -60,6 +61,11 @@ API docs: <http://localhost:8000/docs> · Health: `/api/health` · WebSocket: `/
 - `GET  /api/alerts` · `POST /api/alerts/{id}/ack`
 - `GET  /api/analytics/site/{id}` · `/api/analytics/summary`
 - `POST /api/ingest` — sensor packet ingestion (used by the RTL-SDR forwarder)
+- `POST /api/v1/readings` — hardware device ingestion (see
+  `../backend-api-spec.md`); `X-Device-Key` header, auto-registers new
+  `device_id`s under a fallback "unassigned" site
+- `PATCH /api/stations/{id}` — admin provisioning, e.g. assign an
+  auto-registered device to its real, calibrated site
 - `WS   /ws` — live `reading` / `alert` broadcasts
 
 ## Deploy (Render — recommended)

@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     # Alert identity
     alert_sender: str = "floodwatch@unilag.edu.ng"
 
+    # Shared-secret auth for hardware device ingestion (POST /api/v1/readings).
+    # Comma-separated list: one key for the whole fleet, or a few keys so a
+    # single compromised unit can be revoked without rotating everyone else.
+    # Empty (default) disables the check, for local/dev use before devices
+    # are provisioned with a real key.
+    device_api_keys: str = ""
+
+    @property
+    def device_api_key_set(self) -> set[str]:
+        return {k.strip() for k in self.device_api_keys.split(",") if k.strip()}
+
     @property
     def database_name(self) -> str:
         if self.db_name:
