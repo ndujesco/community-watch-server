@@ -10,11 +10,17 @@ network (hardware assembly is the next project phase).
 ## Architecture
 
 ```
-RTL-SDR receiver ──HTTP POST /api/ingest──▶ FastAPI ──▶ Flood Engine ──▶ MongoDB
-(or built-in simulator)                        │            (dH/dt, T_flood,
-                                               │             classification)
-                                               └── WebSocket /ws ──▶ Dashboard
+ESP32 node (WiFi) ──HTTP POST /api/v1/readings──▶ FastAPI ──▶ Flood Engine ──▶ MongoDB
+(or built-in simulator, via /api/ingest)              │           (dH/dt, T_flood,
+                                                      │            classification)
+                                                      └── WebSocket /ws ──▶ Dashboard
 ```
+
+The node reads an ultrasonic water-level sensor, an analog rain-intensity
+sensor, a climate (temp/humidity) sensor, and two float switches, then POSTs
+a JSON reading directly over WiFi — see `../backend-api-spec.md` for the
+exact payload. `/api/ingest` is the earlier RF/simulator-shaped path, kept
+for the built-in simulator and any RF gateway forwarder.
 
 | File | Responsibility |
 |------|----------------|
@@ -60,12 +66,12 @@ API docs: <http://localhost:8000/docs> · Health: `/api/health` · WebSocket: `/
 - `GET  /api/readings` · `/api/readings/latest` · `/api/readings/timeseries`
 - `GET  /api/alerts` · `POST /api/alerts/{id}/ack`
 - `GET  /api/analytics/site/{id}` · `/api/analytics/summary`
-- `POST /api/ingest` — sensor packet ingestion (used by the RTL-SDR forwarder)
-- `POST /api/v1/readings` — hardware device ingestion (see
+- `POST /api/v1/readings` — real hardware ingestion (see
   `../backend-api-spec.md`); `X-Device-Key` header, auto-registers new
   `device_id`s under a fallback "unassigned" site
 - `PATCH /api/stations/{id}` — admin provisioning, e.g. assign an
   auto-registered device to its real, calibrated site
+- `POST /api/ingest` — legacy/simulator-shaped packet ingestion
 - `WS   /ws` — live `reading` / `alert` broadcasts
 
 ## Deploy (Render — recommended)

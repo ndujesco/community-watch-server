@@ -17,3 +17,5 @@ services:
         value: "true"
       - key: CORS_ORIGINS
         sync: false            # e.g. https://your-app.vercel.app
+      - key: DEVICE_API_KEYS
+        sync: false            # comma-separated shared secret(s) for X-Device-Key
