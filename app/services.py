@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from pymongo.errors import DuplicateKeyError
 
-from . import db, engine
+from . import db, engine, sms
 from .fixtures import DEMO_SITE
 from .models import Classification, DeviceReadingPacket, IngestPacket, SiteThresholds
 from .realtime import manager
@@ -201,7 +201,28 @@ async def _create_alert(
     }
     insert = await db.alerts().insert_one(alert_doc)
     alert_doc["_id"] = insert.inserted_id
+
+    if "sms" in channels:
+        await _dispatch_sms(site=site, level=level, message=message)
+
     return alert_doc
+
+
+async def _dispatch_sms(*, site: dict, level: Classification, message: str) -> None:
+    """SMS every active subscriber whose min_level is at or below this alert's
+    severity, and who is subscribed to this site (or to all sites)."""
+    subs = await db.subscribers().find({
+        "active": True,
+        "$or": [{"site_id": None}, {"site_id": site["site_id"]}],
+    }).to_list(length=None)
+    # engine.compose_message() already produces a complete, self-contained
+    # sentence (e.g. "FLOOD WARNING: ..."), so it's sent as-is rather than
+    # wrapped in another prefix.
+    text = message
+    for sub in subs:
+        sub_level = Classification(sub.get("min_level", "warning"))
+        if _RANK[sub_level] <= _RANK[level]:
+            await sms.send_sms(sub["phone"], text)
 
 
 # --- Hardware device ingestion (POST /api/v1/readings) ---------------------

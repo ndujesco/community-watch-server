@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     # Alert identity
     alert_sender: str = "floodwatch@unilag.edu.ng"
 
+    # SMS delivery via Twilio (https://twilio.com) for Warning/Emergency alerts.
+    # A trial account needs no business verification -- you verify your own
+    # number as a recipient. Empty settings disable sending -- the alert
+    # still records "sms" as a channel, it just isn't dispatched. See
+    # SMS_SETUP.md.
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+
     # Shared-secret auth for hardware device ingestion (POST /api/v1/readings).
     # Comma-separated list: one key for the whole fleet, or a few keys so a
     # single compromised unit can be revoked without rotating everyone else.
