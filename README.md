@@ -1,4 +1,4 @@
-# FloodWatch API — IoT Flood Early-Warning System (Backend)
+# FloodWatch API: IoT Flood Early-Warning System (Backend)
 
 FastAPI + MongoDB backend implementing the site-specific flood detection and
 prediction model from the project report (Chapter 3): rate of water-level
@@ -18,7 +18,7 @@ ESP32 node (WiFi) ──HTTP POST /api/v1/readings──▶ FastAPI ──▶ Fl
 
 The node reads an ultrasonic water-level sensor, an analog rain-intensity
 sensor, a climate (temp/humidity) sensor, and two float switches, then POSTs
-a JSON reading directly over WiFi — see `../backend-api-spec.md` for the
+a JSON reading directly over WiFi; see `../backend-api-spec.md` for the
 exact payload. `/api/ingest` is the earlier RF/simulator-shaped path, kept
 for the built-in simulator and any RF gateway forwarder.
 
@@ -51,7 +51,7 @@ API docs: <http://localhost:8000/docs> · Health: `/api/health` · WebSocket: `/
 
 | Var | Default | Notes |
 |-----|---------|-------|
-| `MONGO_URI` | — | MongoDB connection string (required) |
+| `MONGO_URI` | *(required)* | MongoDB connection string |
 | `SIMULATOR_ENABLED` | `true` | Set `false` to disable the live simulator |
 | `SIMULATOR_INTERVAL_SECONDS` | `5` | Seconds between simulated readings |
 | `CORS_ORIGINS` | localhost dev origins | Comma-separated; `*.vercel.app` is always allowed |
@@ -60,21 +60,21 @@ API docs: <http://localhost:8000/docs> · Health: `/api/health` · WebSocket: `/
 
 ## Key endpoints
 
-- `GET  /api/overview` — network-wide status snapshot
+- `GET  /api/overview`: network-wide status snapshot
 - `GET  /api/sites` · `GET /api/sites/{id}` · `PATCH /api/sites/{id}`
 - `GET  /api/stations` · `GET /api/stations/{id}`
 - `GET  /api/readings` · `/api/readings/latest` · `/api/readings/timeseries`
 - `GET  /api/alerts` · `POST /api/alerts/{id}/ack`
 - `GET  /api/analytics/site/{id}` · `/api/analytics/summary`
-- `POST /api/v1/readings` — real hardware ingestion (see
+- `POST /api/v1/readings`: real hardware ingestion (see
   `../backend-api-spec.md`); `X-Device-Key` header, auto-registers new
   `device_id`s under a fallback "unassigned" site
-- `PATCH /api/stations/{id}` — admin provisioning, e.g. assign an
+- `PATCH /api/stations/{id}`: admin provisioning, e.g. assign an
   auto-registered device to its real, calibrated site
-- `POST /api/ingest` — legacy/simulator-shaped packet ingestion
-- `WS   /ws` — live `reading` / `alert` broadcasts
+- `POST /api/ingest`: legacy/simulator-shaped packet ingestion
+- `WS   /ws`: live `reading` / `alert` broadcasts
 
-## Deploy (Render — recommended)
+## Deploy (Render, recommended)
 
 This service needs a **long-running process** (WebSocket + background simulator),
 so a serverless host like Vercel is **not** suitable. Render's free web service
