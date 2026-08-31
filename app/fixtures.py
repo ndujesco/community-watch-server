@@ -1,121 +1,39 @@
-"""Canonical deployment sites and sensor stations.
+"""Canonical deployment site for the live single-node demo.
 
-Five flood-prone Lagos locations with deliberately different drainage
-characteristics, so the analytics illustrate the site-specific coefficient
-alpha (report Figure 3.5): the same rainfall yields very different water-level
-trajectories at a blocked earth channel vs. a clean concrete drain.
+This project was designed around a multi-site network (see the flood engine
+in engine.py and the simulator in simulator.py, which can still animate any
+number of sites for validation), but the physical hardware built for this
+final-year project is a single ESP32 sensor node. So there is exactly one
+real deployment site here; the device auto-registers under it on its first
+reading (see services.py: _ensure_station / _ensure_demo_site).
 """
 from __future__ import annotations
 
 from .models import SiteThresholds
 
-SITES = [
-    {
-        "site_id": "ajegunle",
-        "name": "Ajegunle Canal",
-        "area": "Ajegunle, Ajeromi-Ifelodun LGA, Lagos",
-        "lat": 6.4549, "lng": 3.3293,
-        "channel_depth": 1.2,
-        "channel_width": 1.5,
-        "channel_type": "earth-banked",
-        "catchment_area": 42000,
-        "drainage_quality": "poor",
-        "alpha": 0.030,
-        "baseline_drainage": 0.30,
-        "thresholds": SiteThresholds().model_dump(),
-    },
-    {
-        "site_id": "lekki",
-        "name": "Lekki Phase 1 Drain",
-        "area": "Lekki Phase 1, Eti-Osa LGA, Lagos",
-        "lat": 6.4413, "lng": 3.4710,
-        "channel_depth": 1.5,
-        "channel_width": 2.0,
-        "channel_type": "concrete-lined",
-        "catchment_area": 38000,
-        "drainage_quality": "good",
-        "alpha": 0.014,
-        "baseline_drainage": 0.62,
-        "thresholds": SiteThresholds().model_dump(),
-    },
-    {
-        "site_id": "mushin",
-        "name": "Mushin Collector Drain",
-        "area": "Mushin LGA, Lagos",
-        "lat": 6.5274, "lng": 3.3490,
-        "channel_depth": 1.0,
-        "channel_width": 1.2,
-        "channel_type": "concrete (undersized)",
-        "catchment_area": 51000,
-        "drainage_quality": "poor",
-        "alpha": 0.028,
-        "baseline_drainage": 0.34,
-        "thresholds": SiteThresholds().model_dump(),
-    },
-    {
-        "site_id": "oshodi",
-        "name": "Oshodi Channel",
-        "area": "Oshodi-Isolo LGA, Lagos",
-        "lat": 6.5557, "lng": 3.3486,
-        "channel_depth": 1.1,
-        "channel_width": 1.4,
-        "channel_type": "concrete (partially blocked)",
-        "catchment_area": 47000,
-        "drainage_quality": "moderate",
-        "alpha": 0.022,
-        "baseline_drainage": 0.45,
-        "thresholds": SiteThresholds().model_dump(),
-    },
-    {
-        "site_id": "surulere",
-        "name": "Ojuelegba Underbridge Drain",
-        "area": "Surulere LGA, Lagos",
-        "lat": 6.5095, "lng": 3.3620,
-        "channel_depth": 1.3,
-        "channel_width": 1.8,
-        "channel_type": "concrete-lined",
-        "catchment_area": 44000,
-        "drainage_quality": "moderate",
-        "alpha": 0.020,
-        "baseline_drainage": 0.50,
-        "thresholds": SiteThresholds().model_dump(),
-    },
-]
+DEMO_SITE = {
+    "site_id": "demo",
+    "name": "FloodWatch Demo Site",
+    "area": "Live hardware demo — single ESP32 sensor node",
+    "lat": 6.5244,
+    "lng": 3.3792,
+    "channel_depth": 1.2,               # matches the bench rig's Hmax
+    "channel_width": None,
+    "channel_type": "bench/demo rig",
+    "catchment_area": None,
+    "drainage_quality": "moderate",
+    "alpha": 0.02,
+    "baseline_drainage": 0.4,
+    "thresholds": SiteThresholds().model_dump(),
+}
 
-# One co-located sensor node per site, plus one node in maintenance to show
-# the station-health states in the UI.
-STATIONS = [
-    {
-        "station_id": "FWS-AJG-01", "name": "Ajegunle Node 1", "site_id": "ajegunle",
-        "location": "Canal footbridge, Ajegunle", "lat": 6.4549, "lng": 3.3293,
-        "firmware": "fw-1.2.0",
-    },
-    {
-        "station_id": "FWS-LEK-01", "name": "Lekki Node 1", "site_id": "lekki",
-        "location": "Admiralty Way culvert", "lat": 6.4413, "lng": 3.4710,
-        "firmware": "fw-1.2.0",
-    },
-    {
-        "station_id": "FWS-MSN-01", "name": "Mushin Node 1", "site_id": "mushin",
-        "location": "Idi-Oro collector", "lat": 6.5274, "lng": 3.3490,
-        "firmware": "fw-1.1.0",
-    },
-    {
-        "station_id": "FWS-OSH-01", "name": "Oshodi Node 1", "site_id": "oshodi",
-        "location": "Oshodi overpass channel", "lat": 6.5557, "lng": 3.3486,
-        "firmware": "fw-1.2.0",
-    },
-    {
-        "station_id": "FWS-SUR-01", "name": "Surulere Node 1", "site_id": "surulere",
-        "location": "Ojuelegba underbridge", "lat": 6.5095, "lng": 3.3620,
-        "firmware": "fw-1.2.0",
-    },
-    {
-        "station_id": "FWS-SUR-02", "name": "Surulere Node 2", "site_id": "surulere",
-        "location": "Lawanson secondary drain", "lat": 6.5121, "lng": 3.3552,
-        "firmware": "fw-1.0.0", "status": "maintenance",
-    },
-]
+# Kept as a list for compatibility with code that iterates "all sites"
+# (simulator.py, seed.py) — there is just the one entry.
+SITES = [DEMO_SITE]
+
+# No stations are pre-seeded: the real device creates its own station record
+# the first time it POSTs to /api/v1/readings (zero-touch provisioning).
+STATIONS: list[dict] = []
 
 
 def site_params_map():

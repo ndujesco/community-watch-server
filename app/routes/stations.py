@@ -50,9 +50,7 @@ async def get_station(station_id: str):
 
 @router.patch("/{station_id}")
 async def update_station(station_id: str, update: StationUpdate):
-    """Admin provisioning — e.g. assign an auto-registered device (site_id
-    "unassigned") to its real, calibrated site once installed in the field.
-    """
+    """Admin provisioning — rename a station, mark it under maintenance, etc."""
     patch = update.model_dump(exclude_none=True)
     if "status" in patch:
         patch["status"] = update.status.value  # type: ignore[union-attr]

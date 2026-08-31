@@ -63,7 +63,7 @@ class SiteUpdate(BaseModel):
 class SensorHealth(BaseModel):
     rain_gauge: bool = True
     ultrasonic: bool = True
-    bmp280: bool = True
+    climate: bool = True          # DHT11 temperature/humidity sensor
     float_switch: bool = True
 
 
@@ -85,11 +85,11 @@ class Station(BaseModel):
 
 
 class StationUpdate(BaseModel):
-    """Admin provisioning: name a station, move it to a real site, etc.
+    """Admin provisioning: rename a station, move its status, etc.
 
-    Primarily used to assign a real ``site_id`` (with its calibrated
-    ``channel_depth``/thresholds) to a station that was auto-registered under
-    the fallback "unassigned" site on its first hardware reading.
+    In this single-site deployment every station belongs to the one demo
+    site, so ``site_id`` reassignment isn't part of the normal flow — this
+    stays generic in case a future deployment adds a second site.
     """
 
     name: str | None = None

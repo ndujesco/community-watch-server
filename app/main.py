@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -11,6 +12,11 @@ from . import __version__, db, simulator
 from .config import get_settings
 from .realtime import manager
 from .routes import api_router
+
+# Plain "%(message)s" — the reading-log blocks in services.py already carry
+# their own structure, so a logger-name/timestamp prefix would just clutter
+# `render logs --tail`.
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 @asynccontextmanager

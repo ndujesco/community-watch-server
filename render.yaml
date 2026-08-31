@@ -14,7 +14,7 @@ services:
       - key: MONGO_URI
         sync: false            # set this in the dashboard (secret)
       - key: SIMULATOR_ENABLED
-        value: "true"
+        value: "false"   # single real ESP32 demo — keep this off in production
       - key: CORS_ORIGINS
         sync: false            # e.g. https://your-app.vercel.app
       - key: DEVICE_API_KEYS

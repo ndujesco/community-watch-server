@@ -10,15 +10,19 @@ Given a decoded sensor packet, this:
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from pymongo.errors import DuplicateKeyError
 
 from . import db, engine
+from .fixtures import DEMO_SITE
 from .models import Classification, DeviceReadingPacket, IngestPacket, SiteThresholds
 from .realtime import manager
 from .serialize import jsonify
+
+logger = logging.getLogger("floodwatch.ingest")
 
 # Severity ranking for transition detection / subscriber filtering.
 _RANK = {
@@ -202,82 +206,98 @@ async def _create_alert(
 
 # --- Hardware device ingestion (POST /api/v1/readings) ---------------------
 #
-# The physical ESP32 nodes speak a different wire format than the RF/simulator
+# The physical ESP32 node speaks a different wire format than the RF/simulator
 # pipeline above (backend-api-spec.md): raw ultrasonic/climate/rain/float
 # fields, a device-generated MAC-derived `device_id`, no wall clock, and no
 # pre-existing station/site record. `process_device_reading` adapts that
-# payload into the same flood engine and alerting path used everywhere else,
-# so readings from real hardware and the simulator land in one unified
-# `readings`/`alerts` collection and dashboard. See the "Implementation
-# decisions" section appended to backend-api-spec.md for the reasoning behind
-# the choices below (auto-registration, shared-secret auth, rain proxy, etc).
+# payload into the same flood engine and alerting path used everywhere else.
+# See the "Implementation decisions" section appended to backend-api-spec.md
+# for the reasoning behind the choices below (auto-registration, shared-secret
+# auth, rain proxy, etc).
+#
+# This deployment has exactly one real site (fixtures.DEMO_SITE) — the device
+# auto-registers directly under it on its first reading. There is nowhere
+# else to reassign it to, by design (see [[frontend-single-site]] in the
+# project README).
 
-_UNASSIGNED_SITE_ID = "unassigned"
-
-
-def _unassigned_site_doc() -> dict:
-    return {
-        "site_id": _UNASSIGNED_SITE_ID,
-        "name": "Unassigned Devices",
-        "area": "Pending site assignment",
-        "lat": 0.0,
-        "lng": 0.0,
-        "channel_depth": 2.0,
-        "channel_width": None,
-        "channel_type": "unknown",
-        "catchment_area": None,
-        "drainage_quality": "moderate",
-        "alpha": 0.02,
-        "baseline_drainage": 0.4,
-        "thresholds": SiteThresholds().model_dump(),
-    }
+_DEMO_SITE_ID = DEMO_SITE["site_id"]
 
 
-async def _ensure_unassigned_site() -> dict:
-    """Fallback site for devices an admin hasn't assigned to a real deployment yet."""
-    site = await db.sites().find_one({"site_id": _UNASSIGNED_SITE_ID})
+async def _ensure_demo_site() -> dict:
+    """Idempotently ensure the single demo site exists, and return it."""
+    site = await db.sites().find_one({"site_id": _DEMO_SITE_ID})
     if site is not None:
         return site
     await db.sites().update_one(
-        {"site_id": _UNASSIGNED_SITE_ID},
-        {"$setOnInsert": _unassigned_site_doc()},
+        {"site_id": _DEMO_SITE_ID},
+        {"$setOnInsert": dict(DEMO_SITE)},
         upsert=True,
     )
-    return await db.sites().find_one({"site_id": _UNASSIGNED_SITE_ID})
+    return await db.sites().find_one({"site_id": _DEMO_SITE_ID})
 
 
 async def _ensure_station(device_id: str, location: str, ts: datetime) -> dict:
     """Auto-register a station the first time a device_id is seen.
 
-    Devices auto-register (report Section: open item resolved in favour of
-    zero-touch provisioning) under the "unassigned" fallback site; an admin
-    reassigns them to a real, calibrated site via PATCH /api/stations/{id}.
+    Zero-touch provisioning: the device registers itself under the single
+    demo site on its very first POST. No admin reassignment step exists in
+    this deployment because there is only one site to assign to.
     """
     station = await db.stations().find_one({"station_id": device_id})
     if station is not None:
         return station
-    await _ensure_unassigned_site()
+    await _ensure_demo_site()
     doc = {
         "station_id": device_id,
         "name": device_id,
-        "site_id": _UNASSIGNED_SITE_ID,
+        "site_id": _DEMO_SITE_ID,
         "location": location,
-        "lat": 0.0,
-        "lng": 0.0,
+        "lat": DEMO_SITE["lat"],
+        "lng": DEMO_SITE["lng"],
         "status": "online",
-        "battery": 100.0,
-        "solar_voltage": 5.0,
         "rssi": -70.0,
         "firmware": "hardware",
-        "sensors": {"rain_gauge": True, "ultrasonic": True, "bmp280": True, "float_switch": True},
+        "sensors": {"rain_gauge": True, "ultrasonic": True, "climate": True, "float_switch": True},
         "installed_at": ts,
         "last_seen": ts,
     }
     try:
         await db.stations().insert_one(doc)
+        logger.info("New device auto-registered: %s -> site '%s'", device_id, _DEMO_SITE_ID)
     except DuplicateKeyError:
         pass  # concurrent request from the same device won the race
     return await db.stations().find_one({"station_id": device_id})
+
+
+def _format_reading_log(packet: DeviceReadingPacket, reading: dict, alert: dict | None) -> str:
+    """One human-readable block per POST — this is what shows up in
+    `render logs --tail` (or the Render dashboard) so the sensor data is
+    directly readable without digging through raw JSON.
+    """
+    fs = ", ".join(
+        f"{s.name}={'TRIGGERED' if s.triggered else 'open'}" for s in packet.float_switches
+    ) or "none"
+    lines = [
+        f"┌─ FloodWatch reading ── {packet.device_id} "
+        f"(seq {packet.sequence}, up {packet.uptime_ms / 1000:.1f}s) "
+        + "─" * max(1, 40 - len(packet.device_id)),
+        f"│ Water level   {reading['water_level']:.2f} m  →  "
+        f"{reading['capacity_pct']:.0f}% of Hmax        [{reading['classification'].upper()}]",
+        f"│ Rain          {reading['rainfall_rate']:.1f}% wetness "
+        f"(raw ADC {packet.rain.raw_adc}, sensor {packet.rain.status})",
+        f"│ Climate       {reading['temperature']:.1f}°C · {reading['humidity']:.0f}% RH "
+        f"(DHT11 {packet.climate.status})",
+        f"│ Ultrasonic    {packet.ultrasonic.status}"
+        + (f" ({packet.ultrasonic.distance_cm:.1f} cm)" if packet.ultrasonic.distance_cm is not None else ""),
+        f"│ Float sw      {fs}",
+        f"│ WiFi          {reading['rssi']} dBm",
+    ]
+    if reading.get("device_rebooted"):
+        lines.append("│ ⚠ device reboot detected (uptime_ms reset)")
+    if alert is not None:
+        lines.append(f"│ → ALERT fired: {alert['previous_level']} -> {alert['level']}")
+    lines.append("└" + "─" * 60)
+    return "\n".join(lines)
 
 
 def _accumulate_rain(prev: dict | None, rainfall_rate: float, ts: datetime) -> float:
@@ -311,7 +331,7 @@ async def process_device_reading(packet: DeviceReadingPacket, *, broadcast: bool
 
     site = await db.sites().find_one({"site_id": station["site_id"]})
     if site is None:
-        site = await _ensure_unassigned_site()
+        site = await _ensure_demo_site()
     hmax = float(site["channel_depth"])
     thresholds = site["thresholds"]
 
@@ -420,7 +440,7 @@ async def process_device_reading(packet: DeviceReadingPacket, *, broadcast: bool
             "last_sequence": packet.sequence,
             "last_uptime_ms": packet.uptime_ms,
             "sensors.ultrasonic": packet.ultrasonic.status == "ok",
-            "sensors.bmp280": climate_ok,
+            "sensors.climate": climate_ok,
             "sensors.rain_gauge": packet.rain.status == "ok",
             "sensors.float_switch": True,
         }},
@@ -440,6 +460,8 @@ async def process_device_reading(packet: DeviceReadingPacket, *, broadcast: bool
             previous=prev_class,
             tflood=result.tflood,
         )
+
+    logger.info(_format_reading_log(packet, reading_doc, alert_doc))
 
     if broadcast:
         await manager.broadcast({"type": "reading", "data": jsonify(reading_doc)})

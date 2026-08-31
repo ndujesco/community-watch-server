@@ -22,8 +22,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8080,http://127.0.0.1:5173"
     )
 
-    # Live simulator (generates fresh sensor readings so the dashboard is live)
-    simulator_enabled: bool = True
+    # Live simulator (generates fresh sensor readings so the dashboard is live).
+    # Defaults OFF: the live demo shows exactly one real ESP32 sensor node, and
+    # this simulator would otherwise inject fake readings alongside/instead of
+    # it. Only enable for local development against a scratch database.
+    simulator_enabled: bool = False
     simulator_interval_seconds: float = 5.0
 
     # Alert identity
