@@ -47,7 +47,14 @@ async def ensure_indexes(db: AsyncDatabase) -> None:
     await db.alerts.create_index([("ts", DESCENDING)])
     await db.alerts.create_index([("site_id", ASCENDING), ("ts", DESCENDING)])
     await db.alerts.create_index([("alert_id", ASCENDING)], unique=True)
-    await db.subscribers.create_index([("phone", ASCENDING)], unique=True)
+    # Subscribers moved from phone (SMS) to email -- drop the old unique
+    # index if it's still there from before, so a second email-only
+    # subscriber doesn't collide as a "duplicate" missing phone value.
+    try:
+        await db.subscribers.drop_index("phone_1")
+    except Exception:
+        pass  # already gone, or never existed on this database
+    await db.subscribers.create_index([("email", ASCENDING)], unique=True)
 
 
 # Collection accessors -------------------------------------------------------

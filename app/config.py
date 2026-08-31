@@ -32,14 +32,18 @@ class Settings(BaseSettings):
     # Alert identity
     alert_sender: str = "floodwatch@unilag.edu.ng"
 
-    # SMS delivery via Twilio (https://twilio.com) for Warning/Emergency alerts.
-    # A trial account needs no business verification -- you verify your own
-    # number as a recipient. Empty settings disable sending -- the alert
-    # still records "sms" as a channel, it just isn't dispatched. See
-    # SMS_SETUP.md.
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_from_number: str = ""
+    # Email delivery for Warning/Emergency alerts, via the user's own
+    # email-composer service (Gmail underneath, credentials live there, not
+    # here). Always fires regardless of the SMS settings below.
+    email_composer_url: str = "https://email-composer-phi.vercel.app"
+
+    # SMS delivery via Vonage (https://vonage.com), alongside email, for
+    # subscribers who additionally provide a phone number. Verified working
+    # with a real send during this session. Empty key/secret disables it --
+    # email alone still fires.
+    vonage_api_key: str = ""
+    vonage_api_secret: str = ""
+    vonage_from: str = "Vonage APIs"
 
     # Shared-secret auth for hardware device ingestion (POST /api/v1/readings).
     # Comma-separated list: one key for the whole fleet, or a few keys so a

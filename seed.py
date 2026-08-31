@@ -53,7 +53,11 @@ def main():
     db.alerts.create_index([("ts", DESCENDING)])
     db.alerts.create_index([("alert_id", ASCENDING)], unique=True)
     try:
-        db.subscribers.create_index([("phone", ASCENDING)], unique=True)
+        db.subscribers.drop_index("phone_1")  # old SMS-era index, if present
+    except Exception:
+        pass
+    try:
+        db.subscribers.create_index([("email", ASCENDING)], unique=True)
     except Exception:
         pass
 

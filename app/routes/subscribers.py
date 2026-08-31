@@ -1,4 +1,4 @@
-"""SMS/push alert subscriber management (report Section 3.6.5)."""
+"""Email alert subscriber management (report Section 3.6.5)."""
 from __future__ import annotations
 
 import uuid
@@ -29,7 +29,7 @@ async def add_subscriber(sub: Subscriber):
     try:
         await db.subscribers().insert_one(doc)
     except DuplicateKeyError:
-        raise HTTPException(409, "A subscriber with this phone number already exists")
+        raise HTTPException(409, "A subscriber with this email address already exists")
     return jsonify(doc)
 
 

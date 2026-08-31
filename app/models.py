@@ -234,7 +234,8 @@ class AckRequest(BaseModel):
 # --- Subscribers -----------------------------------------------------------
 class Subscriber(BaseModel):
     name: str
-    phone: str
+    email: str                           # required -- every subscriber gets email
+    phone: str | None = None             # optional -- also gets SMS if provided
     site_id: str | None = None           # None => all sites
     min_level: Classification = Classification.warning
     active: bool = True

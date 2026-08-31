@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from pymongo.errors import DuplicateKeyError
 
-from . import db, engine, sms
+from . import db, email_alerts, engine, sms
 from .fixtures import DEMO_SITE
 from .models import Classification, DeviceReadingPacket, IngestPacket, SiteThresholds
 from .realtime import manager
@@ -159,10 +159,12 @@ async def _create_alert(
     cap_attrs = engine.cap_attributes(level)
     message = engine.compose_message(level, site["name"], tflood)
 
-    # Which delivery channels fire for this severity.
+    # Which delivery channels fire for this severity. "sms" is included
+    # whenever a subscriber *could* get one (has a phone number) -- it's a
+    # declared channel, not a per-send guarantee, same as "email" here.
     channels = ["dashboard"]
     if _RANK[level] >= _RANK[Classification.warning]:
-        channels += ["sms", "push"]
+        channels += ["email", "sms"]
 
     cap = {
         "identifier": alert_id,
@@ -202,27 +204,56 @@ async def _create_alert(
     insert = await db.alerts().insert_one(alert_doc)
     alert_doc["_id"] = insert.inserted_id
 
-    if "sms" in channels:
-        await _dispatch_sms(site=site, level=level, message=message)
+    if "email" in channels:
+        await _dispatch_alerts(site=site, level=level, message=message, cap=cap)
 
     return alert_doc
 
 
-async def _dispatch_sms(*, site: dict, level: Classification, message: str) -> None:
-    """SMS every active subscriber whose min_level is at or below this alert's
-    severity, and who is subscribed to this site (or to all sites)."""
+def _alert_email_html(site_name: str, level: Classification, message: str, cap: dict) -> str:
+    color = {
+        Classification.watch: "#d97706",
+        Classification.warning: "#dc2626",
+        Classification.emergency: "#991b1b",
+    }.get(level, "#374151")
+    return f"""
+    <div style="font-family: -apple-system, Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <div style="background:{color}; color:#fff; padding:16px 20px; border-radius:8px 8px 0 0;">
+        <h2 style="margin:0; font-size:18px;">FloodWatch {level.value.upper()}</h2>
+        <p style="margin:4px 0 0; font-size:13px; opacity:0.9;">{site_name}</p>
+      </div>
+      <div style="border:1px solid #e5e7eb; border-top:none; padding:20px; border-radius:0 0 8px 8px;">
+        <p style="font-size:15px; color:#111827; line-height:1.5;">{message}</p>
+        <p style="font-size:12px; color:#6b7280; margin-top:20px;">
+          Sent {cap['sent']} &middot; CAP identifier {cap['identifier']}<br/>
+          This is an automated alert from a single-node FloodWatch hardware demo, not a
+          public early-warning service.
+        </p>
+      </div>
+    </div>
+    """
+
+
+async def _dispatch_alerts(
+    *, site: dict, level: Classification, message: str, cap: dict
+) -> None:
+    """Notify every active subscriber whose min_level is at or below this
+    alert's severity, and who is subscribed to this site (or to all sites).
+    Email always fires (every subscriber has one); SMS additionally fires
+    for subscribers who also gave a phone number, if Vonage is configured
+    (sms.send_sms no-ops otherwise)."""
     subs = await db.subscribers().find({
         "active": True,
         "$or": [{"site_id": None}, {"site_id": site["site_id"]}],
     }).to_list(length=None)
-    # engine.compose_message() already produces a complete, self-contained
-    # sentence (e.g. "FLOOD WARNING: ..."), so it's sent as-is rather than
-    # wrapped in another prefix.
-    text = message
+    subject = f"FloodWatch {level.value.upper()} — {site['name']}"
+    html = _alert_email_html(site["name"], level, message, cap)
     for sub in subs:
         sub_level = Classification(sub.get("min_level", "warning"))
         if _RANK[sub_level] <= _RANK[level]:
-            await sms.send_sms(sub["phone"], text)
+            await email_alerts.send_alert_email(sub["email"], subject, html)
+            if sub.get("phone"):
+                await sms.send_sms(sub["phone"], message)
 
 
 # --- Hardware device ingestion (POST /api/v1/readings) ---------------------
