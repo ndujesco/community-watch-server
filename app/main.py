@@ -20,7 +20,8 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 # Also fan the same ingestion-log messages out to GET /api/logs (a live,
 # terminal-styled view of them in the browser) in addition to stdout.
-logstream.install()
+logstream.install("floodwatch.ingest", channel="readings")
+logstream.install("floodwatch.raw", channel="raw")
 
 
 @asynccontextmanager
