@@ -234,26 +234,36 @@ def _alert_email_html(site_name: str, level: Classification, message: str, cap: 
     """
 
 
+# Every subscriber's email is real and theirs, so email goes to whoever
+# actually subscribed. SMS is different: the public /status page lets
+# *anyone* type in *any* phone number, and a real SMS costs real account
+# credit per send -- so regardless of what any subscriber record says
+# (or whether anyone subscribed with a phone at all), every SMS this demo
+# ever sends goes to this one fixed, verified number.
+_DEMO_SMS_NUMBER = "+2347061217361"
+
+
 async def _dispatch_alerts(
     *, site: dict, level: Classification, message: str, cap: dict
 ) -> None:
-    """Notify every active subscriber whose min_level is at or below this
+    """Email every active subscriber whose min_level is at or below this
     alert's severity, and who is subscribed to this site (or to all sites).
-    Email always fires (every subscriber has one); SMS additionally fires
-    for subscribers who also gave a phone number, if Vonage is configured
-    (sms.send_sms no-ops otherwise)."""
+    Separately, if any such subscriber exists, also SMS the fixed demo
+    number above once -- never a subscriber-supplied number."""
     subs = await db.subscribers().find({
         "active": True,
         "$or": [{"site_id": None}, {"site_id": site["site_id"]}],
     }).to_list(length=None)
     subject = f"FloodWatch {level.value.upper()} — {site['name']}"
     html = _alert_email_html(site["name"], level, message, cap)
+    any_qualifying = False
     for sub in subs:
         sub_level = Classification(sub.get("min_level", "warning"))
         if _RANK[sub_level] <= _RANK[level]:
+            any_qualifying = True
             await email_alerts.send_alert_email(sub["email"], subject, html)
-            if sub.get("phone"):
-                await sms.send_sms(sub["phone"], message)
+    if any_qualifying:
+        await sms.send_sms(_DEMO_SMS_NUMBER, message)
 
 
 # --- Hardware device ingestion (POST /api/v1/readings) ---------------------
