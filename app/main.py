@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import __version__, db, simulator
+from . import __version__, db, logstream, simulator
 from .config import get_settings
 from .realtime import manager
 from .routes import api_router
@@ -17,6 +17,10 @@ from .routes import api_router
 # their own structure, so a logger-name/timestamp prefix would just clutter
 # `render logs --tail`.
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+# Also fan the same ingestion-log messages out to GET /api/logs (a live,
+# terminal-styled view of them in the browser) in addition to stdout.
+logstream.install()
 
 
 @asynccontextmanager

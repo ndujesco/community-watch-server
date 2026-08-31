@@ -6,6 +6,7 @@ from . import (
     analytics,
     device_readings,
     ingest,
+    logs,
     readings,
     sites,
     stations,
@@ -21,6 +22,7 @@ api_router.include_router(readings.router, prefix="/readings", tags=["readings"]
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(subscribers.router, prefix="/subscribers", tags=["subscribers"])
+api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(ingest.router, tags=["ingest"])
 
 # Real hardware ingestion (backend-api-spec.md): POST /api/v1/readings.
